@@ -7,12 +7,19 @@ import random
 import pandas as pd
 from requests.packages.urllib3.exceptions import InsecureRequestWarning  # type: ignore
 import subprocess
-#  temp login to paper: ohrikq855
+import toml
+
+# Load configuration from a TOML file
+with open("config.toml", "r") as f:
+    config = toml.load(f)
+
+BASE_URL = config['BASE_URL']
+HEADERS = config['HEADERS']
+COOKIE = config['COOKIE']
+USERNAME = config['USERNAME']
 
 # TODO move to config
-BASE_URL = "https://localhost:5000/v1"
-headers = {"User-Agent": "MyApp/1.0", "Accept": "*/*", "Connection": "keep-alive"}
-
+assert isinstance(config, dict), "Config should be a dictionary"
 
 # Get account ID assuming only one account in profile
 def get_account_id():
@@ -29,19 +36,19 @@ session.verify = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
-session.cookies.set("JSESSIONID", "your_cookie_here")
+session.cookies.set("JSESSIONID", COOKIE)
 
 # TODO could move all urls to a config file
 
 
 # Fetch response from the API
-def get_response(url: str, headers: dict = headers, params: dict = None):
+def get_response(url: str, headers: dict = HEADERS, params: dict = None):
     url = f"{BASE_URL}{url}"
     response = session.get(url, headers=headers, params=params)
     return response
 
 
-def post_response(url: str, headers: dict = headers, data: dict = None):
+def post_response(url: str, headers: dict = HEADERS, data: dict = None):
     url = f"{BASE_URL}{url}"
     response = session.post(url, headers=headers, json=data)
     return response
@@ -222,7 +229,7 @@ def place_order(symbol: str, quantity: int, side: Literal["BUY", "SELL"]):
     }
 
     response = post_response(
-        f"/api/iserver/account/{account_id}/orders", headers=headers, data=order_payload
+        f"/api/iserver/account/{account_id}/orders", headers=HEADERS, data=order_payload
     )
 
     if response.status_code == 200:
@@ -283,7 +290,7 @@ def currency_exchange(from_currency: str, to_currency: str, amount: float = 0.0)
         ]
     }
     response = post_response(
-        f"/api/iserver/account/{account_id}/orders", headers=headers, data=payload
+        f"/api/iserver/account/{account_id}/orders", headers=HEADERS, data=payload
     )
     if response.status_code == 200:
         print(f"Converted {amount} {from_currency} to {to_currency}")
