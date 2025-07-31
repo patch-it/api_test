@@ -5,7 +5,6 @@ import os
 import stat
 import random
 import pandas as pd
-from requests.packages.urllib3.exceptions import InsecureRequestWarning  # type: ignore
 import subprocess
 import tomli
 
@@ -14,6 +13,7 @@ with open("config.toml", "rb") as f:
     config = tomli.load(f)
 
 # TODO fetch cookie automatically
+# TODO could move all urls to a config file
 BASE_URL = config["BASE_URL"]
 HEADERS = config["HEADERS"]
 COOKIE = config["COOKIE"]
@@ -28,15 +28,10 @@ def get_account_id():
     return account_id
 
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-session = requests.Session()
-session.verify = False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
 session.cookies.set("JSESSIONID", COOKIE)
-
-# TODO could move all urls to a config file
 
 
 # Fetch response from the API

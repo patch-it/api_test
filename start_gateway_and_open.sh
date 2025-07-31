@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 echo "Starting IBKR Gateway..."
 sh ./venv/bin/run.sh root/conf.yaml &
 
