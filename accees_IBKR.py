@@ -6,6 +6,8 @@ import pandas as pd
 from requests.packages.urllib3.exceptions import InsecureRequestWarning  # type: ignore
 import subprocess
 
+#  temp login to paper: ohrikq855
+
 # TODO move to config
 BASE_URL = "https://localhost:5000/v1"
 headers = {"User-Agent": "MyApp/1.0", "Accept": "*/*", "Connection": "keep-alive"}
@@ -19,7 +21,7 @@ def get_account_id():
     return account_id
 
 
-# TODO fetch cookie automatically
+# TODO fetch cookie automatically and add to config
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
@@ -27,7 +29,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
 session.cookies.set(
-    "JSESSIONID", "ECF143824B3ED32C3D20BE90E3F4A578.ny5wwwdam1-internet"
+    "JSESSIONID", "your_cookie_here"
 )
 
 # TODO could move all urls to a config file
@@ -114,6 +116,9 @@ def get_market_data(conid: str):
     """
     params = {"conids": conid, "fields": "31,55,70"}
     response = get_response("/api/iserver/marketdata/snapshot", params=params)
+    if response.status_code != 200:
+        print(f"Failed to fetch market data: {response.status_code} - {response.text}")
+        return None
     return response.json()
 
 
@@ -124,22 +129,29 @@ def check_market(tickers: list):
     Args:
         tickers (list): List of stock ticker symbols to check.
     """
+    keys_to_check = ["31", "55", "70"]  # Last, Bid, Ask -> config
     for symbol in tickers:
         print(f"\nChecking {symbol}...")
         conid = get_conid(symbol)
         if not conid:
             print(f"Could not fetch contract ID for {symbol}.")
             continue
-        data = get_market_data(conid)
+
+        data = loop_market_data(conid, keys_to_check)
+
+
         # TODO expand data points and check for data before calling get
-        if data:
-            snapshot = data[0]
+        if isinstance(data, list):
             print(
-                f"{symbol}: Last={snapshot.get('31')}, Bid={snapshot.get('55')}, Ask={snapshot.get('70')}"
+                f"{symbol}: Last={data[0].get('31')}, Bid={data[0].get('55')}, Ask={data[0].get('70')}"
             )
         else:
-            print(f"No market data found for {symbol}.")
-    # time.sleep(1.5)  # Rate limiting lol
+            missing_keys = [key for key in keys_to_check if key not in data]
+            print(
+                f"Market data for {symbol} is incomplete. Expected keys: {keys_to_check}. Missing keys: {missing_keys}"
+            )
+
+        # time.sleep(1.5)  # Rate limiting lol
 
 
 # Get single account information of a given stock
@@ -236,7 +248,7 @@ def get_account_balances(currency: Literal["EUR", "USD"]):
 
     if response.status_code == 200:
         data = response.json()
-        print(f"Money to spend: {currency} - ", data[currency]["cashbalance"])
+        #print(f"Money to spend: {currency} - ", data[currency]["cashbalance"])
         return data[currency]["cashbalance"]
     else:
         print(f"Failed to get account summary: {response.status_code} {response.text}")
@@ -282,12 +294,40 @@ def currency_exchange(from_currency: str, to_currency: str, amount: float = 0.0)
         print(f"Failed to convert currency: {response.status_code} - {response.text}")
         return False
 
+def loop_market_data(conid: str, keys_to_check: list):
+    '''Loops through market data requests for a given contract ID (conid) until the required keys are found or maximum attempts are reached.
+    Args:
+        conid (str): The contract ID of the stock.
+        keys_to_check (list): List of keys to check in the market data.
+    Returns:
+        list: A list of dictionaries containing market data if the required keys are found, otherwise returns the first dict in data.
+      '''  
+    for attempt in range(10):
+        data = get_market_data(conid)
+
+        if data is None:
+            return data[0]
+
+        if not isinstance(data, list) or not all(isinstance(d, dict) for d in data):
+            print(f"Unexpected data format expected a list of dictionaries but got {type(data)}")
+            return data[0]
+
+        if any(all(key in d for key in keys_to_check) for d in data):
+            return data
+
+        # Check if any dict contains both '31' and '70'
+        found = any('31' in d and '70' in d for d in data)
+        if found:
+            return data
+
+    print("Reached maximum attempts without finding all keys.")
+    return data[0]
 
 if __name__ == "__main__":
     # Verify connection
     try:
         check_session()
-    except ConnectionError as e:
+    except ConnectionError:
         result = subprocess.run(
             ["./start_gateway_and_open.sh"], capture_output=True, text=True
         )
