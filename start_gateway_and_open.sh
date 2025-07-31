@@ -1,9 +1,9 @@
 #!/bin/bash
 
-cd gateway || { echo "Could not enter 'gateway' directory."; exit 1; }
+
 
 echo "Starting IBKR Gateway..."
-sh bin/run.sh root/conf.yaml &
+sh ./venv/bin/run.sh root/conf.yaml &
 
 sleep 5
 

@@ -1,11 +1,12 @@
 from typing import Literal
 import requests
 import urllib3
+import os
+import stat
 import random
 import pandas as pd
 from requests.packages.urllib3.exceptions import InsecureRequestWarning  # type: ignore
 import subprocess
-
 #  temp login to paper: ohrikq855
 
 # TODO move to config
@@ -323,16 +324,35 @@ def loop_market_data(conid: str, keys_to_check: list):
     print("Reached maximum attempts without finding all keys.")
     return data[0]
 
+
 if __name__ == "__main__":
     # Verify connection
     try:
         check_session()
-    except ConnectionError:
-        result = subprocess.run(
-            ["./start_gateway_and_open.sh"], capture_output=True, text=True
+    except ConnectionError as e:
+        print(f"Connection to IBKR Client Portal failed: {e}\nAttempting to start IB Gateway...")
+
+        try:
+            # Set execute permissions for the script
+            st = os.stat('./start_gateway_and_open.sh')
+            os.chmod('./start_gateway_and_open.sh', st.st_mode | stat.S_IEXEC)
+
+            result = subprocess.run(
+                ["./start_gateway_and_open.sh"],
+                capture_output=True,
+                text=True,
+                check=True
         )
-        print(result.stdout)
-        print(result.stderr)
+            print(result.stdout)
+            if result.stderr:
+                print(f"Error: {result.stderr}")
+        except (PermissionError) as e:
+            print(f"Permission error: {e}\nMake sure the script has execute permissions. " \
+            "\nSetting execute permissions for start_gateway_and_open.sh...")
+
+            
+            
+
 
     # Check status for account
     print("Auth status:", get_response("/api/iserver/auth/status").json())
