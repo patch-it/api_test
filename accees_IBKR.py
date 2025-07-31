@@ -7,19 +7,18 @@ import random
 import pandas as pd
 from requests.packages.urllib3.exceptions import InsecureRequestWarning  # type: ignore
 import subprocess
-import toml
+import tomli
 
 # Load configuration from a TOML file
-with open("config.toml", "r") as f:
-    config = toml.load(f)
+with open("config.toml", "rb") as f:
+    config = tomli.load(f)
 
-BASE_URL = config['BASE_URL']
-HEADERS = config['HEADERS']
-COOKIE = config['COOKIE']
-USERNAME = config['USERNAME']
+# TODO fetch cookie automatically
+BASE_URL = config["BASE_URL"]
+HEADERS = config["HEADERS"]
+COOKIE = config["COOKIE"]
+USERNAME = config["USERNAME"]
 
-# TODO move to config
-assert isinstance(config, dict), "Config should be a dictionary"
 
 # Get account ID assuming only one account in profile
 def get_account_id():
@@ -29,7 +28,6 @@ def get_account_id():
     return account_id
 
 
-# TODO fetch cookie automatically and add to config
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
