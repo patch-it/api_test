@@ -1,32 +1,29 @@
 #!/bin/bash
 
-# example setting a JAVA_HOME and adding to PATH
-#export JAVA_HOME=/usr/local/jdk1.8_x64/
-#export PATH=$JAVA_HOME/bin:$PATH
+# usage: ./run.sh [conf.yaml]
 
-if [ $# -lt 1 ]; then
-    >&2 echo "usage: $0 /path/to/conf.yaml"
-    exit 1
-fi
+CONFIG_FILE=${1:-conf.yaml}
 
-config_file=$1
-config_path=$(dirname $1)
-name=$(basename $config_path)
+# Move to the correct directory
+cd "$(dirname "$0")/../root" || {
+  echo "Failed to cd into clientportal.gw/root"
+  exit 1
+}
 
-export RUNTIME_PATH="$config_path:dist/ibgroup.web.core.iblink.router.clientportal.gw.jar:build/lib/runtime/*"
+export RUNTIME_PATH=".:../dist/ibgroup.web.core.iblink.router.clientportal.gw.jar:../build/lib/runtime/*"
 
-echo "running $verticle "
+echo "running Java Gateway..."
 echo " runtime path : $RUNTIME_PATH"
-echo " config file  : $config_file"
+echo " config file  : $CONFIG_FILE"
 
 java \
--server \
--Dvertx.disableDnsResolver=true \
--Djava.net.preferIPv4Stack=true \
--Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory \
--Dnologback.statusListenerClass=ch.qos.logback.core.status.OnConsoleStatusListener \
--Dnolog4j.debug=true \
--Dnolog4j2.debug=true \
--cp "${RUNTIME_PATH}" \
-ibgroup.web.core.clientportal.gw.GatewayStart \
---conf ../$config_file \
+  -server \
+  -Dvertx.disableDnsResolver=true \
+  -Djava.net.preferIPv4Stack=true \
+  -Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory \
+  -Dnologback.statusListenerClass=ch.qos.logback.core.status.OnConsoleStatusListener \
+  -Dnolog4j.debug=true \
+  -Dnolog4j2.debug=true \
+  -cp "$RUNTIME_PATH" \
+  ibgroup.web.core.clientportal.gw.GatewayStart \
+  --conf "$CONFIG_FILE"

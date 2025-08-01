@@ -1,24 +1,23 @@
 from typing import Literal
 import requests
 import urllib3
-import os
-import stat
 import random
 import pandas as pd
 import subprocess
 import tomli
+import time
+from pathlib import Path
 
 # Load configuration from a TOML file
 with open("config.toml", "rb") as f:
     config = tomli.load(f)
 
-# TODO fetch cookie automatically
 # TODO could move all urls to a config file
 BASE_URL = config["BASE_URL"]
 HEADERS = config["HEADERS"]
-COOKIE = config["COOKIE"]
 USERNAME = config["USERNAME"]
-
+START_SCRIPT = config["START_SCRIPT"]
+GATEWAY_URL = config["GATEWAY_URL"]
 
 # Get account ID assuming only one account in profile
 def get_account_id():
@@ -31,7 +30,7 @@ def get_account_id():
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 session = requests.Session()
 session.verify = False
-session.cookies.set("JSESSIONID", COOKIE)
+#session.cookies.set("JSESSIONID", COOKIE)
 
 
 # Fetch response from the API
@@ -71,6 +70,11 @@ def check_current_orders():
                 "Size": order_size,
             }
             return pd.DataFrame(orders_data)
+        else:
+            print("No current orders found.")
+            return pd.DataFrame(columns=["Stock", "Status", "Size"])
+    else:
+        print(f"Failed to fetch current orders: {response.status_code} - {response.text} got {response.status_code}")
 
 
 def check_session():
@@ -325,34 +329,67 @@ def loop_market_data(conid: str, keys_to_check: list):
     return data[0]
 
 
-if __name__ == "__main__":
-    # Verify connection
+def wait_for_login(timeout=120):
+    """
+    Poll the gateway until the user is signed in or timeout occurs.
+    """
+    start = time.time()
+    print("Waiting for user login...")
+    while time.time() - start < timeout:
+        try:
+            r = requests.get(GATEWAY_URL, verify=False, timeout=2)
+            if r.status_code == 200:
+                print("Sign in verified.")
+                return True
+        except requests.exceptions.RequestException:
+            pass
+        time.sleep(3)
+    print(f"Timeout: User did not sign in within expected time - {timeout} seconds.")
+    return False
+
+def connect_to_localhost():
+    '''
+    Starts the IBKR Gateway script and waits for user login.
+    Returns:
+        bool: True if the gateway started and user logged in successfully, False otherwise.
+    '''
     try:
-        check_session()
-    except ConnectionError as e:
-        print(
-            f"Connection to IBKR Client Portal failed: {e}\nAttempting to start IB Gateway..."
+        result = subprocess.Popen(
+            [START_SCRIPT],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=Path(__file__).parent,
+            shell=True,
         )
 
-        try:
-            # Set execute permissions for the script
-            st = os.stat("./start_gateway_and_open.sh")
-            os.chmod("./start_gateway_and_open.sh", st.st_mode | stat.S_IEXEC)
+        print("Gateway started, please login via your browser.")
+        login_succesfull = wait_for_login()
 
-            result = subprocess.run(
-                ["./start_gateway_and_open.sh"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            print(result.stdout)
-            if result.stderr:
-                print(f"Error: {result.stderr}")
-        except PermissionError as e:
-            print(
-                f"Permission error: {e}\nMake sure the script has execute permissions. "
-                "\nSetting execute permissions for start_gateway_and_open.sh..."
-            )
+        if not login_succesfull:
+            result.terminate()
+            print("Gateway process terminated due to login timeout.")
+            return False
+        else:
+            return True
+
+    except Exception as e:
+        print(f"Failed to start gateway script: {e}")
+        return False
+
+
+
+if __name__ == "__main__":
+    try:
+        check_session()
+    except (ConnectionError, requests.exceptions.ConnectionError):
+        print(
+            "No connection to IBKR\nAttempting to start IB Gateway..."
+        )
+        connection = connect_to_localhost()
+        if not connection:
+            print("Failed to connect to IBKR Gateway. Exiting.")
+            exit(1)
+        check_session()
 
     # Check status for account
     print("Auth status:", get_response("/api/iserver/auth/status").json())
@@ -388,7 +425,7 @@ if __name__ == "__main__":
 
     # Convert currency from EUR to USD
     currency_exchange("EUR", "USD", 1000)
-
+    
     # Place orders for the selected tickers
     for ticker in TICKERS:
         place_order(ticker, 1, "BUY")
