@@ -1,0 +1,7 @@
+# TODO Add section headers
+
+BASE_URL = "https://localhost:5000/v1"
+HEADERS = {"User-Agent"= "MyApp/1.0", "Accept"= "*/*", "Connection"= "keep-alive"}
+USERNAME = "your_paper_username"
+START_SCRIPT = "./clientportal.gw/bin/start_gateway_and_open.sh"
+GATEWAY_URL = "https://localhost:5000/v1/portal/sso/validate"

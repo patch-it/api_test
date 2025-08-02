@@ -2,8 +2,7 @@
 *.log
 # Ignore temp folders
 temp/ 
-# config
-config.toml
+
 # Ignore Python cache files
 __pycache__/
 *.pyc
